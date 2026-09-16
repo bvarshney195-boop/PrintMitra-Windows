@@ -2,8 +2,11 @@ using Microsoft.Win32;
 using PrintMitra.Models;
 using PrintMitra.Services;
 using System.Globalization;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 
@@ -15,8 +18,14 @@ public partial class MainWindow : Window
     private readonly CardImageProcessor _processor = new();
     private readonly PrinterService _printers = new();
     private readonly PrintLayoutService _layouts = new();
+    private readonly GeneralLayoutService _generalLayouts = new();
+    private readonly ScanService _scanner = new();
     private readonly CalibrationStore _calibrations = new();
     private string? _frontSource, _backSource, _frontCorrected, _backCorrected;
+    private readonly List<string> _photoFiles = new();
+    private readonly List<string> _documentImageFiles = new();
+    private string? _selectedPdf, _passportPath, _scanPath;
+    private FixedDocument? _lastDocument;
     private CalibrationProfile _calibration = CalibrationProfile.Default("Unselected printer");
 
     public MainWindow()
@@ -25,6 +34,11 @@ public partial class MainWindow : Window
         PrivacyWorkspace.CleanupStale();
         PaperCombo.ItemsSource = PaperDefinition.Common;
         PaperCombo.SelectedIndex = 0;
+        foreach (var combo in new[] { PhotoPaperCombo, DocumentPaperCombo, PassportPaperCombo, ScanPaperCombo })
+        {
+            combo.ItemsSource = PaperDefinition.Common;
+            combo.SelectedIndex = 0;
+        }
         LoadPrinters();
         RefreshCalibrationPreview();
         Closed += (_, _) => _workspace.Dispose();
@@ -44,15 +58,112 @@ public partial class MainWindow : Window
     private void Show(string panel)
     {
         HomePanel.Visibility = panel == "home" ? Visibility.Visible : Visibility.Collapsed;
+        PhotosPanel.Visibility = panel == "photos" ? Visibility.Visible : Visibility.Collapsed;
+        DocumentsPanel.Visibility = panel == "documents" ? Visibility.Visible : Visibility.Collapsed;
+        PassportPanel.Visibility = panel == "passport" ? Visibility.Visible : Visibility.Collapsed;
+        ScanPanel.Visibility = panel == "scan" ? Visibility.Visible : Visibility.Collapsed;
         CardPanel.Visibility = panel == "card" ? Visibility.Visible : Visibility.Collapsed;
         PreviewPanel.Visibility = panel == "preview" ? Visibility.Visible : Visibility.Collapsed;
         CalibrationPanel.Visibility = panel == "calibration" ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ShowHome_Click(object sender, RoutedEventArgs e) => Show("home");
+    private void ShowPhotos_Click(object sender, RoutedEventArgs e) => Show("photos");
+    private void ShowDocuments_Click(object sender, RoutedEventArgs e) => Show("documents");
+    private void ShowPassport_Click(object sender, RoutedEventArgs e) => Show("passport");
+    private void ShowScan_Click(object sender, RoutedEventArgs e) => Show("scan");
     private void ShowCard_Click(object sender, RoutedEventArgs e) => Show("card");
-    private void ShowPreview_Click(object sender, RoutedEventArgs e) { RefreshPreview(); Show("preview"); }
+    private void ShowPreview_Click(object sender, RoutedEventArgs e) { if (_lastDocument is null) RefreshPreview(); else PreviewViewer.Document = _lastDocument; Show("preview"); }
     private void ShowCalibration_Click(object sender, RoutedEventArgs e) { RefreshCalibrationPreview(); Show("calibration"); }
+
+    private void ChoosePhotos_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = ImageDialog(true, "Choose photographs");
+        if (dialog.ShowDialog() != true) return;
+        _photoFiles.Clear(); _photoFiles.AddRange(dialog.FileNames);
+        PhotoFilesList.ItemsSource = null; PhotoFilesList.ItemsSource = _photoFiles.Select(Path.GetFileName).ToArray();
+    }
+
+    private void PreviewPhotos_Click(object sender, RoutedEventArgs e)
+    {
+        if (PhotoPaperCombo.SelectedItem is not PaperDefinition paper || _photoFiles.Count == 0) { MessageBox.Show("Choose at least one photograph."); return; }
+        var columns = int.TryParse(((PhotoColumnsCombo.SelectedItem as ComboBoxItem)?.Content?.ToString()), out var value) ? value : 2;
+        var fill = PhotoCropCombo.SelectedIndex == 1;
+        PresentDocument(_generalLayouts.BuildPhotoGrid(_photoFiles, paper, columns, 10, 5, fill), "Photo sheet preview", "Review the photo arrangement and paper selection.", false);
+    }
+
+    private void ChooseDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Title = "Choose document pages or PDF", Filter = "Documents and images|*.pdf;*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff", Multiselect = true };
+        if (dialog.ShowDialog() != true) return;
+        _documentImageFiles.Clear();
+        _documentImageFiles.AddRange(dialog.FileNames.Where(p => !p.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)));
+        _selectedPdf = dialog.FileNames.FirstOrDefault(p => p.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase));
+        DocumentFilesList.ItemsSource = dialog.FileNames.Select(Path.GetFileName).ToArray();
+        OpenPdfButton.IsEnabled = _selectedPdf is not null;
+    }
+
+    private void OpenPdf_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedPdf is null) return;
+        Process.Start(new ProcessStartInfo(_selectedPdf) { UseShellExecute = true });
+        AppStatus.Text = "PDF opened in the default Windows application. Press Ctrl+P there to print.";
+    }
+
+    private void PreviewDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        if (DocumentPaperCombo.SelectedItem is not PaperDefinition paper || _documentImageFiles.Count == 0)
+        {
+            if (_selectedPdf is not null) { OpenPdf_Click(sender, e); return; }
+            MessageBox.Show("Choose one or more photographed or scanned document pages."); return;
+        }
+        PresentDocument(_generalLayouts.BuildDocumentPages(_documentImageFiles, paper, 10, DocumentFitCheck.IsChecked == true), "Document preview", "Each selected image is placed on a separate page.", false);
+    }
+
+    private void ChoosePassport_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = ImageDialog(false, "Choose portrait photograph");
+        if (dialog.ShowDialog() != true) return;
+        _passportPath = dialog.FileName; PassportImage.Source = LoadBitmap(dialog.FileName);
+    }
+
+    private void PassportPresetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded) return;
+        if (PassportPresetCombo.SelectedIndex == 0) { PassportWidthBox.Text = "35"; PassportHeightBox.Text = "45"; }
+        else if (PassportPresetCombo.SelectedIndex == 1) { PassportWidthBox.Text = "50.8"; PassportHeightBox.Text = "50.8"; }
+    }
+
+    private void PreviewPassport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_passportPath is null || PassportPaperCombo.SelectedItem is not PaperDefinition paper) { MessageBox.Show("Choose a portrait photograph."); return; }
+        if (!double.TryParse(PassportWidthBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var width) || !double.TryParse(PassportHeightBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var height) || !int.TryParse(PassportCopiesBox.Text, out var copies)) { MessageBox.Show("Enter valid photo dimensions and copies."); return; }
+        PresentDocument(_generalLayouts.BuildPassportSheet(_passportPath, paper, width, height, copies, PassportGuidesCheck.IsChecked == true), "Passport / ID photo preview", $"Photo size: {width:0.##} × {height:0.##} mm. Verify authority requirements before printing.", true);
+    }
+
+    private void AcquireScan_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _scanPath = _scanner.AcquireImage(_workspace.NewFile(".jpg"));
+            ScannedImage.Source = LoadBitmap(_scanPath); AppStatus.Text = "Scan acquired locally.";
+        }
+        catch (OperationCanceledException) { AppStatus.Text = "Scanning cancelled."; }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Scanner"); }
+    }
+
+    private void PreviewScan_Click(object sender, RoutedEventArgs e)
+    {
+        if (_scanPath is null || ScanPaperCombo.SelectedItem is not PaperDefinition paper) { MessageBox.Show("Scan a page first."); return; }
+        PresentDocument(_generalLayouts.BuildDocumentPages(new[] { _scanPath }, paper, 10, ScanFitCheck.IsChecked == true), "Scanned-page preview", "Review the scanned page before printing.", false);
+    }
+
+    private void PrintAgain_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastDocument is null) return;
+        try { if (_printers.PrintDocument(_lastDocument, PrinterCombo.SelectedItem as string)) AppStatus.Text = "Previous in-session job sent again."; }
+        catch (Exception ex) { MessageBox.Show(ex.Message, "Reprint failed"); }
+    }
 
     private void ChooseFront_Click(object sender, RoutedEventArgs e) => ChooseImage(true);
     private void ChooseBack_Click(object sender, RoutedEventArgs e) => ChooseImage(false);
@@ -101,7 +212,13 @@ public partial class MainWindow : Window
     {
         if (PreviewViewer is null || PaperCombo.SelectedItem is not PaperDefinition paper) return;
         var sets = int.TryParse(SetsBox?.Text, out var count) ? Math.Clamp(count, 1, 20) : 1;
-        PreviewViewer.Document = _layouts.BuildIdentityCardPage(_frontCorrected ?? _frontSource, _backCorrected ?? _backSource, paper, _calibration, sets, CutGuidesCheck?.IsChecked == true);
+        var document = _layouts.BuildIdentityCardPage(_frontCorrected ?? _frontSource, _backCorrected ?? _backSource, paper, _calibration, sets, CutGuidesCheck?.IsChecked == true);
+        PreviewViewer.Document = document;
+        _lastDocument = document;
+        ReprintHomeButton.IsEnabled = true;
+        PreviewTitle.Text = "Aadhaar / PAN preview";
+        PreviewSubtitle.Text = "Identity-card output is 85.60 × 53.98 mm. Keep driver scaling at Actual Size / 100%.";
+        ExactSizeWarning.Visibility = Visibility.Visible;
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)
@@ -152,4 +269,17 @@ public partial class MainWindow : Window
     }
 
     private void NumericOnly_PreviewTextInput(object sender, TextCompositionEventArgs e) => e.Handled = e.Text.Any(c => !char.IsDigit(c));
+
+    private static OpenFileDialog ImageDialog(bool multiple, string title) => new() { Title = title, Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff", Multiselect = multiple };
+
+    private void PresentDocument(FixedDocument document, string title, string subtitle, bool exactSize)
+    {
+        PreviewViewer.Document = document;
+        _lastDocument = document;
+        ReprintHomeButton.IsEnabled = true;
+        PreviewTitle.Text = title;
+        PreviewSubtitle.Text = subtitle;
+        ExactSizeWarning.Visibility = exactSize ? Visibility.Visible : Visibility.Collapsed;
+        Show("preview");
+    }
 }
