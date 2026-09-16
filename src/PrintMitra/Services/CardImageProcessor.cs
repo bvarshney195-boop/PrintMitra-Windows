@@ -1,4 +1,5 @@
 using OpenCvSharp;
+using System.IO;
 
 namespace PrintMitra.Services;
 
@@ -22,7 +23,7 @@ public sealed class CardImageProcessor
         Cv2.FindContours(edges, out Point[][] contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
         var quad = contours
-            .OrderByDescending(Cv2.ContourArea)
+            .OrderByDescending(c => Cv2.ContourArea(c))
             .Select(c => Cv2.ApproxPolyDP(c, 0.02 * Cv2.ArcLength(c, true), true))
             .FirstOrDefault(p => p.Length == 4 && Cv2.ContourArea(p) > resized.Width * resized.Height * 0.12);
 
