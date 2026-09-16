@@ -40,14 +40,71 @@
                 <TextBlock Text="What would you like to print?" FontSize="28" FontWeight="SemiBold"/>
                 <TextBlock Text="Choose a task. PrintMitra prepares the page before opening Windows printing." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,22"/>
                 <UniformGrid Columns="3" Rows="2">
-                  <Button Height="120" Content="Print Photos"/>
-                  <Button Height="120" Content="Print Documents"/>
+                  <Button Height="120" Content="Print Photos" Click="ShowPhotos_Click"/>
+                  <Button Height="120" Content="Print Documents" Click="ShowDocuments_Click"/>
                   <Button Height="120" Content="Print Aadhaar / PAN" Click="ShowCard_Click"/>
-                  <Button Height="120" Content="Passport / ID Photos"/>
-                  <Button Height="120" Content="Scan and Print"/>
-                  <Button Height="120" Content="Print Again" IsEnabled="False"/>
+                  <Button Height="120" Content="Passport / ID Photos" Click="ShowPassport_Click"/>
+                  <Button Height="120" Content="Scan and Print" Click="ShowScan_Click"/>
+                  <Button x:Name="ReprintHomeButton" Height="120" Content="Print Again" Click="PrintAgain_Click" IsEnabled="False"/>
                 </UniformGrid>
               </StackPanel>
+            </Grid>
+
+            <Grid x:Name="PhotosPanel" Visibility="Collapsed">
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <StackPanel><TextBlock Text="Print photos" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Select one or more photographs and arrange them automatically on the selected paper." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
+              <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="310"/></Grid.ColumnDefinitions>
+                <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="16" Margin="0,0,18,0"><ListBox x:Name="PhotoFilesList"/></Border>
+                <StackPanel Grid.Column="1">
+                  <Button Content="Choose photographs" Click="ChoosePhotos_Click"/>
+                  <TextBlock Text="Images per row" FontWeight="SemiBold" Margin="0,12,0,0"/><ComboBox x:Name="PhotoColumnsCombo"><ComboBoxItem>1</ComboBoxItem><ComboBoxItem IsSelected="True">2</ComboBoxItem><ComboBoxItem>3</ComboBoxItem><ComboBoxItem>4</ComboBoxItem></ComboBox>
+                  <TextBlock Text="Crop behaviour" FontWeight="SemiBold"/><ComboBox x:Name="PhotoCropCombo"><ComboBoxItem IsSelected="True">Show complete image</ComboBoxItem><ComboBoxItem>Fill each space</ComboBoxItem></ComboBox>
+                  <TextBlock Text="Paper" FontWeight="SemiBold"/><ComboBox x:Name="PhotoPaperCombo" DisplayMemberPath="Name"/>
+                </StackPanel>
+              </Grid>
+              <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0"><Button Content="Create preview" Background="{StaticResource BrandBrush}" Foreground="White" Click="PreviewPhotos_Click"/></StackPanel>
+            </Grid>
+
+            <Grid x:Name="DocumentsPanel" Visibility="Collapsed">
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <StackPanel><TextBlock Text="Print documents" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Import scanned or photographed pages. PDFs open in the installed Windows PDF application for printing." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
+              <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="310"/></Grid.ColumnDefinitions>
+                <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="16" Margin="0,0,18,0"><ListBox x:Name="DocumentFilesList"/></Border>
+                <StackPanel Grid.Column="1">
+                  <Button Content="Choose document pages or PDF" Click="ChooseDocuments_Click"/>
+                  <Button x:Name="OpenPdfButton" Content="Open selected PDF" Click="OpenPdf_Click" IsEnabled="False"/>
+                  <TextBlock Text="Paper" FontWeight="SemiBold" Margin="0,12,0,0"/><ComboBox x:Name="DocumentPaperCombo" DisplayMemberPath="Name"/>
+                  <CheckBox x:Name="DocumentFitCheck" Content="Show complete page" IsChecked="True" Margin="0,8"/>
+                </StackPanel>
+              </Grid>
+              <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0"><Button Content="Create image-page preview" Background="{StaticResource BrandBrush}" Foreground="White" Click="PreviewDocuments_Click"/></StackPanel>
+            </Grid>
+
+            <Grid x:Name="PassportPanel" Visibility="Collapsed">
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <StackPanel><TextBlock Text="Passport / ID photos" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Create an exact-size photo sheet. Always verify the current authority requirements before submission." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
+              <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="310"/></Grid.ColumnDefinitions>
+                <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="16" Margin="0,0,18,0"><Image x:Name="PassportImage" Stretch="Uniform"/></Border>
+                <StackPanel Grid.Column="1">
+                  <Button Content="Choose portrait photograph" Click="ChoosePassport_Click"/>
+                  <TextBlock Text="Preset" FontWeight="SemiBold" Margin="0,12,0,0"/><ComboBox x:Name="PassportPresetCombo" SelectionChanged="PassportPresetCombo_SelectionChanged"><ComboBoxItem IsSelected="True">35 × 45 mm</ComboBoxItem><ComboBoxItem>2 × 2 inch</ComboBoxItem><ComboBoxItem>Custom</ComboBoxItem></ComboBox>
+                  <UniformGrid Columns="2"><StackPanel Margin="0,0,6,0"><TextBlock Text="Width (mm)"/><TextBox x:Name="PassportWidthBox" Text="35"/></StackPanel><StackPanel Margin="6,0,0,0"><TextBlock Text="Height (mm)"/><TextBox x:Name="PassportHeightBox" Text="45"/></StackPanel></UniformGrid>
+                  <TextBlock Text="Copies"/><TextBox x:Name="PassportCopiesBox" Text="8"/>
+                  <TextBlock Text="Paper"/><ComboBox x:Name="PassportPaperCombo" DisplayMemberPath="Name"/>
+                  <CheckBox x:Name="PassportGuidesCheck" Content="Show cutting guides" IsChecked="True"/>
+                </StackPanel>
+              </Grid>
+              <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0"><Button Content="Create photo sheet" Background="{StaticResource BrandBrush}" Foreground="White" Click="PreviewPassport_Click"/></StackPanel>
+            </Grid>
+
+            <Grid x:Name="ScanPanel" Visibility="Collapsed">
+              <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+              <StackPanel><TextBlock Text="Scan and print" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Uses the standard Windows scanner dialog for Canon G2000 and WIA-compatible imageCLASS devices." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
+              <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="310"/></Grid.ColumnDefinitions>
+                <Border Background="{StaticResource PanelBrush}" CornerRadius="10" Padding="16" Margin="0,0,18,0"><Image x:Name="ScannedImage" Stretch="Uniform"/></Border>
+                <StackPanel Grid.Column="1"><Button Content="Open Windows scanner" Click="AcquireScan_Click"/><TextBlock Text="Paper" FontWeight="SemiBold" Margin="0,12,0,0"/><ComboBox x:Name="ScanPaperCombo" DisplayMemberPath="Name"/><CheckBox x:Name="ScanFitCheck" Content="Show complete scanned page" IsChecked="True" Margin="0,8"/><TextBlock Text="The official Canon scanner driver must be installed." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}"/></StackPanel>
+              </Grid>
+              <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0"><Button Content="Create scan preview" Background="{StaticResource BrandBrush}" Foreground="White" Click="PreviewScan_Click"/></StackPanel>
             </Grid>
 
             <Grid x:Name="CardPanel" Visibility="Collapsed">
@@ -74,7 +131,7 @@
 
             <Grid x:Name="PreviewPanel" Visibility="Collapsed">
               <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-              <StackPanel><TextBlock Text="Print preview" FontSize="28" FontWeight="SemiBold"/><TextBlock Text="Identity-card size is 85.60 × 53.98 mm. Keep driver scaling at Actual Size / 100%." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
+              <StackPanel><TextBlock x:Name="PreviewTitle" Text="Print preview" FontSize="28" FontWeight="SemiBold"/><TextBlock x:Name="PreviewSubtitle" Text="Review every page before opening Windows printing." Foreground="{StaticResource MutedBrush}" Margin="0,5,0,18"/></StackPanel>
               <Grid Grid.Row="1"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="315"/></Grid.ColumnDefinitions>
                 <Border Background="#DCE5EA" CornerRadius="10" Padding="18" Margin="0,0,18,0"><DocumentViewer x:Name="PreviewViewer"/></Border>
                 <StackPanel Grid.Column="1">
@@ -83,7 +140,7 @@
                   <TextBlock Text="Paper" FontWeight="SemiBold" Margin="0,12,0,0"/><ComboBox x:Name="PaperCombo" DisplayMemberPath="Name" SelectionChanged="PaperCombo_SelectionChanged"/>
                   <TextBlock Text="Complete sets" FontWeight="SemiBold"/><TextBox x:Name="SetsBox" Text="1" PreviewTextInput="NumericOnly_PreviewTextInput" TextChanged="SetsBox_TextChanged"/>
                   <CheckBox x:Name="CutGuidesCheck" Content="Show cutting guides" IsChecked="True" Margin="0,8" Checked="PreviewOption_Changed" Unchecked="PreviewOption_Changed"/>
-                  <Border Background="#FFF6DE" CornerRadius="8" Padding="11" Margin="0,12"><TextBlock Text="Exact-size safeguard: open Printer Properties and keep Fit to Page disabled." TextWrapping="Wrap" Foreground="#7A5200"/></Border>
+                  <Border x:Name="ExactSizeWarning" Background="#FFF6DE" CornerRadius="8" Padding="11" Margin="0,12" Visibility="Collapsed"><TextBlock Text="Exact-size safeguard: open Printer Properties and keep Fit to Page disabled." TextWrapping="Wrap" Foreground="#7A5200"/></Border>
                   <Button Content="Open Windows Print Dialog" Background="{StaticResource BrandBrush}" Foreground="White" Click="Print_Click"/>
                 </StackPanel>
               </Grid>
