@@ -14,6 +14,12 @@ PrintMitra is a fully offline Windows desktop application for simple and precise
 - OpenCV four-corner detection and perspective correction
 - Conservative local contrast improvement
 - One or multiple front/back sets with cutting guides
+- Multi-image photo sheets with fit/fill layout
+- Photographed/scanned document pages with multi-page preview
+- PDF handoff to the installed Windows PDF application
+- Passport/ID photo sheets with 35 × 45 mm, 2 × 2 inch and custom sizes
+- Windows WIA scanner integration
+- In-session Print Again workflow without retaining documents after exit
 - Per-printer X/Y calibration profiles
 - Automatic private temporary-workspace deletion
 - No accounts, telemetry, cloud API or internet requirement at runtime
@@ -21,7 +27,8 @@ PrintMitra is a fully offline Windows desktop application for simple and precise
 ## Important MVP boundaries
 
 - If four-corner detection fails, the processor uses a centred card-ratio crop. A production release should add draggable manual corner handles before printing.
-- PDF rendering, scanning/WIA, passport-photo presets and general photo grids are planned modules, not yet implemented in this MVP.
+- PDFs are opened in the installed Windows PDF application because Windows does not provide a stable built-in WPF PDF renderer. Image-based document pages preview and print inside PrintMitra.
+- Passport cropping currently uses a centred fill crop. Authority-specific biometric face-position validation requires a separately validated face model and is not claimed in this release.
 - Exact physical output depends on the printer driver. In Printer Properties keep scaling at **Actual Size / 100%**, then run calibration.
 - Printed Aadhaar/PAN output is a copy of user-provided content; the app does not alter or recreate identity details or security features.
 
